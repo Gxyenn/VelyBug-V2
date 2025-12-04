@@ -63,10 +63,21 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    const savedSession = localStorage.getItem('vely_user_session');
+    if (savedSession) {
+      try {
+        const sessionData = JSON.parse(savedSession);
+        if (sessionData && new Date(sessionData.expiresAt) > new Date()) {
+          handleLogin(sessionData, false); // Don't re-save to localStorage
+        }
+      } catch (error) {
+        console.error("Failed to parse session data from localStorage", error);
+      }
+    }
     fetchData();
   }, [fetchData]);
 
-  const handleLogin = useCallback((keyData: Key) => {
+  const handleLogin = useCallback((keyData: Key, saveSession = true) => {
     setAuth({ 
       isAuthenticated: true, 
       role: keyData.role, 
@@ -74,6 +85,9 @@ const App: React.FC = () => {
       username: keyData.username,
       expiresAt: keyData.expiresAt 
     });
+    if (saveSession) {
+      localStorage.setItem('vely_user_session', JSON.stringify(keyData));
+    }
   }, []);
 
   const handleLogout = useCallback(() => {
@@ -84,6 +98,7 @@ const App: React.FC = () => {
       username: null,
       expiresAt: undefined
     });
+    localStorage.removeItem('vely_user_session');
   }, []);
 
   // --- API Handlers ---

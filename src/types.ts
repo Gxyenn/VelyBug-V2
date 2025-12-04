@@ -27,6 +27,7 @@ export interface Settings {
 export enum HistoryAction {
   CREATED = 'created',
   DELETED = 'deleted',
+  UPDATED_EXPIRATION = 'updated expiration',
 }
 
 export interface HistoryLog {
@@ -36,4 +37,5 @@ export interface HistoryLog {
   targetUsername: string;
   targetRole: Role;
   timestamp: Date;
+  details?: string;
 }

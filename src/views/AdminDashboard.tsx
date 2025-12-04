@@ -50,7 +50,58 @@ const PlusCircleIcon: React.FC = () => (
 const MinusCircleIcon: React.FC = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
 );
+const CalendarIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+  </svg>
+);
 
+const EditExpirationModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (newDate: Date) => void;
+  currentDate: Date | string | undefined;
+  username: string;
+}> = ({ isOpen, onClose, onSave, currentDate, username }) => {
+  const [newDate, setNewDate] = useState('');
+
+  useEffect(() => {
+    if (currentDate) {
+      setNewDate(new Date(currentDate).toISOString().split('T')[0]);
+    }
+  }, [currentDate]);
+
+  if (!isOpen) return null;
+
+  const handleSave = () => {
+    if (newDate) {
+      onSave(new Date(newDate));
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+      <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md">
+        <h3 className="text-lg font-semibold text-white mb-4">Edit Expiration for {username}</h3>
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium text-gray-300">New Expiration Date</label>
+            <input
+              type="date"
+              value={newDate}
+              onChange={(e) => setNewDate(e.target.value)}
+              className="w-full mt-1 p-2 text-sm bg-gray-900 rounded-md border border-gray-700 focus:ring-[#8A2BE2]"
+            />
+          </div>
+        </div>
+        <div className="flex justify-end gap-4 mt-6">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 rounded-md">Cancel</button>
+          <button onClick={handleSave} className="px-4 py-2 text-sm bg-gradient-to-r from-[#8A2BE2] to-[#4B0082] text-white rounded-md">Save</button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, keys, onAddKey, onDeleteKey, onUpdateKey, currentRole, currentKey, historyLog, onAddHistoryLog, onClearHistory, settings, onSaveSettings, servers, onAddServer, onDeleteServer }) => {
@@ -72,6 +123,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, keys, onAddKe
   const [newKey, setNewKey] = useState({ value: '', role: Role.USER, username: '', duration: '' });
   const [durationError, setDurationError] = useState('');
   const [shownKeyValue, setShownKeyValue] = useState<Record<string, boolean>>({});
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedKey, setSelectedKey] = useState<Key | null>(null);
+
+  const handleUpdateExpiration = async (newDate: Date) => {
+    if (selectedKey) {
+      const updatedKey = { ...selectedKey, expiresAt: newDate };
+      await onUpdateKey(updatedKey);
+
+      const actor = keys.find(k => k.value === currentKey);
+      if (actor) {
+        const newLog: Omit<HistoryLog, 'id'> = {
+          actorUsername: actor.username,
+          action: HistoryAction.UPDATED_EXPIRATION,
+          targetUsername: selectedKey.username,
+          targetRole: selectedKey.role,
+          details: `Set expiration to ${newDate.toLocaleDateString()}`,
+          timestamp: new Date(),
+        };
+        await onAddHistoryLog(newLog);
+      }
+      setIsModalOpen(false);
+      setSelectedKey(null);
+    }
+  };
 
   const handleAddServer = async (e: FormEvent) => {
     e.preventDefault();
@@ -268,6 +343,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, keys, onAddKe
                                         {shownKeyValue[k.id] ? <EyeSlashIcon className="h-4 w-4"/> : <EyeIcon className="h-4 w-4"/>}
                                     </button>
                                  )}
+                                {k.expiresAt && (
+                                  <button
+                                    onClick={() => {
+                                      setSelectedKey(k);
+                                      setIsModalOpen(true);
+                                    }}
+                                    className="text-gray-400 hover:text-white p-1"
+                                  >
+                                    <CalendarIcon />
+                                  </button>
+                                )}
                                 {canDeleteKey && (
                                     <button onClick={() => handleDeleteKey(k.id)} className="text-red-400 hover:text-red-300 p-1 rounded-full hover:bg-red-500/10"><TrashIcon/></button>
                                 )}
@@ -389,13 +475,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, keys, onAddKe
                 historyLog.map(log => (
                     <div key={log.id} className="flex items-center gap-3 bg-gray-900/70 p-2 rounded-md text-sm">
                         <div>
-                            {log.action === HistoryAction.CREATED ? <PlusCircleIcon /> : <MinusCircleIcon />}
+                            {log.action === HistoryAction.CREATED ? <PlusCircleIcon /> : log.action === HistoryAction.DELETED ? <MinusCircleIcon /> : <CalendarIcon />}
                         </div>
                         <div className="flex-1">
                             <span className="font-semibold">{log.actorUsername}</span>
                             <span className="text-gray-300"> {log.action} a key for </span>
                             <span className="font-semibold">{log.targetUsername}</span>
                             <span className="text-xs ml-2 px-2 py-0.5 rounded-full bg-gray-600/30 text-gray-300">{log.targetRole}</span>
+                            {log.details && <span className="text-xs text-gray-400 block">{log.details}</span>}
                         </div>
                         <div className="text-xs text-gray-400">
                             {new Date(log.timestamp).toLocaleString()}
@@ -441,6 +528,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, keys, onAddKe
           {renderTabContent()}
         </div>
       </div>
+      <EditExpirationModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={handleUpdateExpiration}
+        currentDate={selectedKey?.expiresAt}
+        username={selectedKey?.username || ''}
+      />
     </div>
   );
 };

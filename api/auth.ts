@@ -18,6 +18,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (foundKey) {
       // Check if the key is expired
       if (foundKey.expiresAt && new Date(foundKey.expiresAt) < new Date()) {
+        // Log the failed login attempt to history
+        const historyLog = {
+          username: foundKey.username,
+          action: 'Expired Key Login Attempt',
+          details: `User '${foundKey.username}' attempted to log in, but their key has expired.`,
+          timestamp: new Date(),
+        };
+        await db.collection('history').insertOne(historyLog);
+        
         return res.status(403).json({ message: 'Access Key has expired.' });
       }
 
