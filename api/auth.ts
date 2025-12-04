@@ -7,19 +7,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { key } = req.body;
-    if (!key) {
-      return res.status(400).json({ message: 'Access key is required' });
+    const { username, key } = req.body;
+    if (!username || !key) {
+      return res.status(400).json({ message: 'Username and Access Key are required' });
     }
 
     const { db } = await connectToDatabase();
-    const foundKey = await db.collection('keys').findOne({ value: key });
+    const foundKey = await db.collection('keys').findOne({ username: username, value: key });
 
     if (foundKey) {
+      // Check if the key is expired
+      if (foundKey.expiresAt && new Date(foundKey.expiresAt) < new Date()) {
+        return res.status(403).json({ message: 'Access Key has expired.' });
+      }
+
       const { _id, ...keyData } = foundKey;
       return res.status(200).json({ id: _id.toHexString(), ...keyData });
     } else {
-      return res.status(401).json({ message: 'Invalid Access Key' });
+      return res.status(401).json({ message: 'Invalid username or key' });
     }
   } catch (error) {
     console.error('Auth API Error:', error);

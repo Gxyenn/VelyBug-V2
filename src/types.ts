@@ -10,6 +10,7 @@ export interface Key {
   value: string;
   role: Role;
   username: string;
+  expiresAt?: Date | string;
 }
 
 export interface Server {

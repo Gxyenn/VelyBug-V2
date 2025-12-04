@@ -3,12 +3,15 @@ import React, { useState, FormEvent, useEffect } from 'react';
 import { Server } from '../types';
 import Spinner from '../components/Spinner';
 import Checkmark from '../components/Checkmark';
+import Countdown from '../components/Countdown';
 
 interface UserDashboardProps {
   onLogout: () => void;
   botToken: string;
   chatId: string;
   servers: Server[];
+  username: string;
+  expiresAt?: Date | string;
 }
 
 const SendIcon: React.FC = () => (
@@ -46,7 +49,7 @@ const ErrorIcon: React.FC = () => (
 );
 
 
-const UserDashboard: React.FC<UserDashboardProps> = ({ onLogout, botToken, chatId, servers }) => {
+const UserDashboard: React.FC<UserDashboardProps> = ({ onLogout, botToken, chatId, servers, username, expiresAt }) => {
   const [target, setTarget] = useState('');
   const [selectedServerId, setSelectedServerId] = useState<string>(servers[0]?.id || '');
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -195,7 +198,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ onLogout, botToken, chatI
             <div className="flex items-center gap-3">
                 <img src="https://files.catbox.moe/46iz0p.gif" alt="Vely Logo" className="w-8 h-8 rounded-lg object-cover" />
                 <div>
-                    <h1 className="text-xl font-bold text-gray-100">Vely Bug</h1>
+                    <h1 className="text-xl font-bold text-gray-100 capitalize">{username}</h1>
                     <p className="text-sm text-gray-400">Target Dashboard</p>
                 </div>
             </div>
@@ -206,11 +209,18 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ onLogout, botToken, chatI
         </div>
 
         <div className="bg-gray-900 shadow-2xl rounded-2xl p-8 border border-gray-700">
-            <div className="flex flex-col items-center text-center mb-8">
-                <img src="https://files.catbox.moe/46iz0p.gif" alt="Vely Logo" className="w-24 h-24 rounded-2xl object-cover logo-animated-aura mb-6" />
+            <div className="flex flex-col items-center text-center mb-6">
+                <img src="https://files.catbox.moe/46iz0p.gif" alt="Vely Logo" className="w-24 h-24 rounded-2xl object-cover logo-animated-aura mb-4" />
                 <h2 className="text-2xl font-bold text-gray-100">Vely Bug</h2>
                 <p className="text-gray-400 mt-1">Send your target Slect Type bug</p>
             </div>
+            
+            {expiresAt && (
+              <div className="mb-6 flex justify-center">
+                <Countdown expiresAt={expiresAt} />
+              </div>
+            )}
+
             {renderContent()}
         </div>
     </div>

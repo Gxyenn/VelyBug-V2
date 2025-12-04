@@ -19,10 +19,13 @@ const App: React.FC = () => {
     isAuthenticated: boolean;
     role: Role | null;
     key: string | null;
+    username: string | null;
+    expiresAt?: Date | string;
   }>({
     isAuthenticated: false,
     role: null,
     key: null,
+    username: null,
   });
 
   const fetchData = useCallback(async () => {
@@ -64,11 +67,23 @@ const App: React.FC = () => {
   }, [fetchData]);
 
   const handleLogin = useCallback((keyData: Key) => {
-    setAuth({ isAuthenticated: true, role: keyData.role, key: keyData.value });
+    setAuth({ 
+      isAuthenticated: true, 
+      role: keyData.role, 
+      key: keyData.value,
+      username: keyData.username,
+      expiresAt: keyData.expiresAt 
+    });
   }, []);
 
   const handleLogout = useCallback(() => {
-    setAuth({ isAuthenticated: false, role: null, key: null });
+    setAuth({ 
+      isAuthenticated: false, 
+      role: null, 
+      key: null,
+      username: null,
+      expiresAt: undefined
+    });
   }, []);
 
   // --- API Handlers ---
@@ -201,8 +216,15 @@ const App: React.FC = () => {
     }
 
     if (auth.role === Role.USER) {
-      if (settings.botToken && settings.chatId) {
-        return <UserDashboard onLogout={handleLogout} botToken={settings.botToken} chatId={settings.chatId} servers={servers} />;
+      if (settings.botToken && settings.chatId && auth.username) {
+        return <UserDashboard 
+          onLogout={handleLogout} 
+          botToken={settings.botToken} 
+          chatId={settings.chatId} 
+          servers={servers}
+          username={auth.username}
+          expiresAt={auth.expiresAt} 
+        />;
       }
       return <Spinner />;
     }

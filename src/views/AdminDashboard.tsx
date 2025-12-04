@@ -5,7 +5,7 @@ import { Server, Settings, Key, Role, HistoryLog, HistoryAction } from '../types
 interface AdminDashboardProps {
   onLogout: () => void;
   keys: Key[];
-  onAddKey: (key: Omit<Key, 'id'>) => Promise<void>;
+  onAddKey: (key: Omit<Key, 'id' | 'expiresAt'> & { expiresAt?: Date }) => Promise<void>;
   onDeleteKey: (id: string) => Promise<void>;
   onUpdateKey: (key: Key) => Promise<void>;
   currentRole: Role | null;
@@ -67,8 +67,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, keys, onAddKe
 
   const [isMyKeyVisible, setIsMyKeyVisible] = useState(false);
   const [newAdminKey, setNewAdminKey] = useState('');
+  const [newUsername, setNewUsername] = useState('');
   
-  const [newKey, setNewKey] = useState({ value: '', role: Role.USER, username: '' });
+  const [newKey, setNewKey] = useState({ value: '', role: Role.USER, username: '', duration: '' });
   const [shownKeyValue, setShownKeyValue] = useState<Record<string, boolean>>({});
 
   const handleAddServer = async (e: FormEvent) => {
@@ -85,6 +86,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, keys, onAddKe
   const handleSaveSettings = async () => {
     await onSaveSettings(localSettings);
     alert("Settings saved successfully!");
+  };
+
+  const handleChangeUsername = async () => {
+    if (!newUsername.trim()) {
+        alert("New username cannot be empty.");
+        return;
+    }
+    if (keys.some(k => k.username === newUsername)) {
+        alert("This username is already in use.");
+        return;
+    }
+    const myKeyData = keys.find(k => k.value === currentKey);
+    if (myKeyData) {
+        await onUpdateKey({ ...myKeyData, username: newUsername });
+        alert("Your username has been changed. You will now be logged out.");
+        onLogout();
+    }
   };
   
   const handleChangeMyKey = async () => {
@@ -115,6 +133,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, keys, onAddKe
         return;
     }
 
+    const keyToAdd: Omit<Key, 'id' | 'expiresAt'> & { expiresAt?: Date } = {
+      value: newKey.value,
+      role: newKey.role,
+      username: newKey.username,
+    };
+
+    if (newKey.duration) {
+      const durationStr = newKey.duration.toLowerCase();
+      if (durationStr.endsWith('d')) {
+        const days = parseInt(durationStr.slice(0, -1), 10);
+        if (!isNaN(days) && days > 0) {
+          const expiryDate = new Date();
+          expiryDate.setDate(expiryDate.getDate() + days);
+          keyToAdd.expiresAt = expiryDate;
+        }
+      }
+    }
+
     const actor = keys.find(k => k.value === currentKey);
     if (actor) {
         const newLog: Omit<HistoryLog, 'id'> = {
@@ -127,8 +163,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, keys, onAddKe
         await onAddHistoryLog(newLog);
     }
     
-    await onAddKey(newKey);
-    setNewKey({ value: '', role: Role.USER, username: '' });
+    await onAddKey(keyToAdd);
+    setNewKey({ value: '', role: Role.USER, username: '', duration: '' });
   };
 
   const handleDeleteKey = async (id: string) => {
@@ -151,7 +187,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, keys, onAddKe
   const renderKeysManagement = () => {
     return (
         <div className="space-y-6">
-            <form onSubmit={handleAddKey} className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-800/50 rounded-lg">
+            <form onSubmit={handleAddKey} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-800/50 rounded-lg">
                 <div className="md:col-span-1">
                     <label className="text-xs text-gray-400">Username</label>
                     <input type="text" placeholder="e.g., JohnDoe" value={newKey.username} onChange={e => setNewKey({...newKey, username: e.target.value})} className="w-full mt-1 p-2 text-sm bg-gray-900 rounded-md border border-gray-700 focus:ring-[#8A2BE2] focus:border-[#8A2BE2]" />
@@ -159,6 +195,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, keys, onAddKe
                  <div className="md:col-span-1">
                     <label className="text-xs text-gray-400">New Key Value</label>
                     <input type="text" placeholder="Secret key value" value={newKey.value} onChange={e => setNewKey({...newKey, value: e.target.value})} className="w-full mt-1 p-2 text-sm bg-gray-900 rounded-md border border-gray-700 focus:ring-[#8A2BE2] focus:border-[#8A2BE2]" />
+                </div>
+                <div className="md:col-span-1">
+                    <label className="text-xs text-gray-400">Masa Aktif (hari)</label>
+                    <input type="text" placeholder="e.g., 7d" value={newKey.duration} onChange={e => setNewKey({...newKey, duration: e.target.value})} className="w-full mt-1 p-2 text-sm bg-gray-900 rounded-md border border-gray-700 focus:ring-[#8A2BE2] focus:border-[#8A2BE2]" />
                 </div>
                 <div className="md:col-span-1">
                     <label className="text-xs text-gray-400">Role</label>
@@ -263,7 +303,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, keys, onAddKe
         
         <div className="p-4 bg-gray-800/50 rounded-lg">
             <h3 className="text-lg font-semibold mb-4 text-gray-100 border-b border-gray-700 pb-2">Account Security</h3>
-            <div className="space-y-4">
+            <div className="space-y-6">
+                <div>
+                    <label className="text-sm font-medium text-gray-300">Change My Username</label>
+                    <div className="flex items-center gap-2 mt-1">
+                        <input type="text" placeholder="Enter new username" value={newUsername} onChange={e => setNewUsername(e.target.value)} className="w-full p-2 text-sm bg-gray-900 rounded-md border border-gray-700 focus:ring-[#8A2BE2]"/>
+                        <button onClick={handleChangeUsername} className="px-4 py-2 text-sm bg-gradient-to-r from-sky-500 to-blue-600 hover:opacity-90 rounded-md text-white whitespace-nowrap">Change Username</button>
+                    </div>
+                </div>
                 <div>
                     <label className="text-sm font-medium text-gray-300">Your Current Key</label>
                     <div className="relative">
