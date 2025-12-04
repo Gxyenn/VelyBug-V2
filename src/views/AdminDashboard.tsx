@@ -70,6 +70,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, keys, onAddKe
   const [newUsername, setNewUsername] = useState('');
   
   const [newKey, setNewKey] = useState({ value: '', role: Role.USER, username: '', duration: '' });
+  const [durationError, setDurationError] = useState('');
   const [shownKeyValue, setShownKeyValue] = useState<Record<string, boolean>>({});
 
   const handleAddServer = async (e: FormEvent) => {
@@ -122,6 +123,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, keys, onAddKe
     }
   };
 
+  const handleNewKeyChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    const updatedNewKey = { ...newKey, [name]: value };
+    
+    if (name === 'duration') {
+      if (value && !/^\d+d$/.test(value)) {
+        setDurationError("Format tidak valid (contoh: 7d)");
+      } else {
+        setDurationError('');
+      }
+    }
+    
+    if (name === 'role' && value !== Role.USER) {
+      updatedNewKey.duration = '';
+      setDurationError('');
+    }
+
+    setNewKey(updatedNewKey);
+  };
+
   const handleAddKey = async (e: FormEvent) => {
     e.preventDefault();
     if (!newKey.value.trim() || !newKey.username.trim()) {
@@ -132,22 +153,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, keys, onAddKe
         alert("This key or username already exists.");
         return;
     }
+    if (durationError) {
+        alert("Please fix the errors before submitting.");
+        return;
+    }
 
     const keyToAdd: Omit<Key, 'id' | 'expiresAt'> & { expiresAt?: Date } = {
       value: newKey.value,
-      role: newKey.role,
+      role: newKey.role as Role,
       username: newKey.username,
     };
 
-    if (newKey.duration) {
+    if (newKey.role === Role.USER && newKey.duration) {
       const durationStr = newKey.duration.toLowerCase();
-      if (durationStr.endsWith('d')) {
-        const days = parseInt(durationStr.slice(0, -1), 10);
-        if (!isNaN(days) && days > 0) {
-          const expiryDate = new Date();
-          expiryDate.setDate(expiryDate.getDate() + days);
-          keyToAdd.expiresAt = expiryDate;
-        }
+      const days = parseInt(durationStr.slice(0, -1), 10);
+      if (!isNaN(days) && days > 0) {
+        const expiryDate = new Date();
+        expiryDate.setDate(expiryDate.getDate() + days);
+        keyToAdd.expiresAt = expiryDate;
       }
     }
 
@@ -157,7 +180,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, keys, onAddKe
             actorUsername: actor.username,
             action: HistoryAction.CREATED,
             targetUsername: newKey.username,
-            targetRole: newKey.role,
+            targetRole: newKey.role as Role,
             timestamp: new Date(),
         };
         await onAddHistoryLog(newLog);
@@ -185,25 +208,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, keys, onAddKe
   };
   
   const renderKeysManagement = () => {
+    const showDuration = newKey.role === Role.USER;
     return (
         <div className="space-y-6">
-            <form onSubmit={handleAddKey} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-800/50 rounded-lg">
+            <form onSubmit={handleAddKey} className={`grid grid-cols-1 md:grid-cols-${showDuration ? '4' : '3'} gap-4 p-4 bg-gray-800/50 rounded-lg`}>
                 <div className="md:col-span-1">
                     <label className="text-xs text-gray-400">Username</label>
-                    <input type="text" placeholder="e.g., JohnDoe" value={newKey.username} onChange={e => setNewKey({...newKey, username: e.target.value})} className="w-full mt-1 p-2 text-sm bg-gray-900 rounded-md border border-gray-700 focus:ring-[#8A2BE2] focus:border-[#8A2BE2]" />
+                    <input name="username" type="text" placeholder="e.g., JohnDoe" value={newKey.username} onChange={handleNewKeyChange} className="w-full mt-1 p-2 text-sm bg-gray-900 rounded-md border border-gray-700 focus:ring-[#8A2BE2] focus:border-[#8A2BE2]" />
                 </div>
                  <div className="md:col-span-1">
                     <label className="text-xs text-gray-400">New Key Value</label>
-                    <input type="text" placeholder="Secret key value" value={newKey.value} onChange={e => setNewKey({...newKey, value: e.target.value})} className="w-full mt-1 p-2 text-sm bg-gray-900 rounded-md border border-gray-700 focus:ring-[#8A2BE2] focus:border-[#8A2BE2]" />
+                    <input name="value" type="text" placeholder="Secret key value" value={newKey.value} onChange={handleNewKeyChange} className="w-full mt-1 p-2 text-sm bg-gray-900 rounded-md border border-gray-700 focus:ring-[#8A2BE2] focus:border-[#8A2BE2]" />
                 </div>
-                <div className="md:col-span-1">
-                    <label className="text-xs text-gray-400">Masa Aktif (hari)</label>
-                    <input type="text" placeholder="e.g., 7d" value={newKey.duration} onChange={e => setNewKey({...newKey, duration: e.target.value})} className="w-full mt-1 p-2 text-sm bg-gray-900 rounded-md border border-gray-700 focus:ring-[#8A2BE2] focus:border-[#8A2BE2]" />
-                </div>
+                {showDuration && (
+                  <div className="md:col-span-1">
+                      <label className="text-xs text-gray-400">Masa Aktif (hari)</label>
+                      <input name="duration" type="text" placeholder="e.g., 7d" value={newKey.duration} onChange={handleNewKeyChange} className={`w-full mt-1 p-2 text-sm bg-gray-900 rounded-md border ${durationError ? 'border-red-500' : 'border-gray-700'} focus:ring-[#8A2BE2] focus:border-[#8A2BE2]`} />
+                      {durationError && <p className="text-red-400 text-xs mt-1">{durationError}</p>}
+                  </div>
+                )}
                 <div className="md:col-span-1">
                     <label className="text-xs text-gray-400">Role</label>
                     <div className="flex items-center gap-2">
-                        <select value={newKey.role} onChange={e => setNewKey({...newKey, role: e.target.value as Role})} className="w-full mt-1 p-2 text-sm bg-gray-900 rounded-md border border-gray-700 focus:ring-[#8A2BE2] appearance-none">
+                        <select name="role" value={newKey.role} onChange={handleNewKeyChange} className="w-full mt-1 p-2 text-sm bg-gray-900 rounded-md border border-gray-700 focus:ring-[#8A2BE2] appearance-none">
                             <option value={Role.USER}>User</option>
                             <option value={Role.ADMIN}>Admin</option>
                             {isPrivileged && <option value={Role.CREATOR}>Creator</option>}
